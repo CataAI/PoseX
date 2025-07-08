@@ -85,7 +85,8 @@ def main(args: argparse.Namespace):
     buster = PoseBusters(config="redock", top_n=None, max_workers=None)
     buster.config["loading"]["mol_true"]["load_all"] = True
     bust_results = buster.bust_table(bust_data, full_report=True)
-    bust_results["PDB_CCD_ID"] = bust_dict["PDB_CCD_ID"]
+    df_index = bust_data[["mol_pred", "PDB_CCD_ID"]].rename(columns={"mol_pred": "file"})
+    bust_results = pd.merge(bust_results.reset_index(level="file"), df_index, on='file').drop(columns="file")
     if args.dataset in ["posex_self_dock", "posex_cross_dock", "posex_supp"]:
         df_group = get_group_info(args.dataset, args.dataset_folder)
         df_group_sim = pd.read_csv(os.path.join(args.dataset_folder, "qtm.csv"))
