@@ -225,13 +225,12 @@ We provide the results [here](https://drive.google.com/drive/folders/16fqsisTEk4
 If you are interested in our work or use our data and code, please cite the following article:
 
 ```bibtex
-@misc{jiang2025posexaidefeatsphysics,
-      title={PoseX: AI Defeats Physics Approaches on Protein-Ligand Cross Docking}, 
-      author={Yize Jiang and Xinze Li and Yuanyuan Zhang and Jin Han and Youjun Xu and Ayush Pandit and Zaixi Zhang and Mengdi Wang and Mengyang Wang and Chong Liu and Guang Yang and Yejin Choi and Wu-Jun Li and Tianfan Fu and Fang Wu and Junhong Liu},
-      year={2025},
-      eprint={2505.01700},
-      archivePrefix={arXiv},
-      primaryClass={cs.LG},
-      url={https://arxiv.org/abs/2505.01700}, 
+@inproceedings{
+jiang2026posex,
+title={PoseX: {AI} Defeats Physics-based Methods on Protein Ligand Cross-Docking},
+author={Yize Jiang and Xinze Li and Yuanyuan Zhang and Jin Han and Youjun Xu and Ayush Pandit and ZAIXI ZHANG and Mengdi Wang and Mengyang Wang and Chong Liu and Guang Yang and Yejin Choi and Yingzhou Lu and Wu-Jun Li and Tianfan Fu and Fang Wu and Junhong Liu},
+booktitle={The Fourteenth International Conference on Learning Representations},
+year={2026},
+url={https://openreview.net/forum?id=qqzxKudD4T}
 }
 ```
