@@ -39,18 +39,21 @@ def get_sequences_info(cif_fn: Path):
     nan_sequences = {}
 
     if sequenceData is not None:
+        asymIdCol= sequenceData.getAttributeIndex("asym_id")
         entityIdCol = sequenceData.getAttributeIndex("entity_id")
         residueCol = sequenceData.getAttributeIndex("mon_id")
         authresCol = sequenceData.getAttributeIndex("auth_mon_id")
         for row in sequenceData.getRowList():
+            asymId = row[asymIdCol]
             entityId = row[entityIdCol]
             residue = row[residueCol]
             auth_residue = row[authresCol]
-            if entityId not in sequences:
-                sequences[entityId] = []
-                nan_sequences[entityId] = []
-            sequences[entityId].append(residue)
-            nan_sequences[entityId].append(
+            uniq_key = f"{entityId}.{asymId}"
+            if uniq_key not in sequences:
+                sequences[uniq_key] = []
+                nan_sequences[uniq_key] = []
+            sequences[uniq_key].append(residue)
+            nan_sequences[uniq_key].append(
                 None if auth_residue == "?" else auth_residue
             )
 
@@ -59,15 +62,18 @@ def get_sequences_info(cif_fn: Path):
     complete_sequences = []
     uncomplete_sequences = []
     if atomsiteData is not None:
-        # label_asymIdCol = atomsiteData.getAttributeIndex('label_asym_id')
+        label_asymIdCol = atomsiteData.getAttributeIndex('label_asym_id')
         auth_asymIdCol = atomsiteData.getAttributeIndex("auth_asym_id")
         entityIdCol = atomsiteData.getAttributeIndex("label_entity_id")
         for row in atomsiteData.getRowList():
-            asymId = row[auth_asymIdCol]
+            asymId = row[label_asymIdCol]
             entityId = row[entityIdCol]
-            if (entityId in sequences) and (asymId not in visited_chains):
-                complete_sequences.append(Sequence(asymId, sequences[entityId]))
-                uncomplete_sequences.append(Sequence(asymId, nan_sequences[entityId]))
+            uniq_key = f"{entityId}.{asymId}"
+            auth_asymId = row[auth_asymIdCol]
+
+            if (uniq_key in sequences) and (asymId not in visited_chains):
+                complete_sequences.append(Sequence(auth_asymId, sequences[uniq_key]))
+                uncomplete_sequences.append(Sequence(auth_asymId, nan_sequences[uniq_key]))
                 visited_chains.add(asymId)
 
     return complete_sequences, uncomplete_sequences
