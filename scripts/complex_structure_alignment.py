@@ -337,51 +337,60 @@ def run_structure_alignment_v2(predicted_protein_pdb: str, predicted_ligand_sdf:
     best_aligned_rmsd = np.inf
     reference_ligands = Chem.SDMolSupplier(reference_ligands_sdf, sanitize=False, removeHs=True)
     for reference_ligand in reference_ligands:
-        # Save reference ligand to temporary folder
-        with tempfile.TemporaryDirectory() as temp_folder:
-            reference_ligand_sdf = os.path.join(temp_folder, "reference_ligand.sdf")
-            with Chem.SDWriter(reference_ligand_sdf) as w:
-                w.write(reference_ligand)
+        try:
+            # Save reference ligand to temporary folder
+            with tempfile.TemporaryDirectory() as temp_folder:
+                reference_ligand_sdf = os.path.join(temp_folder, "reference_ligand.sdf")
+                with Chem.SDWriter(reference_ligand_sdf) as w:
+                    w.write(reference_ligand)
 
-            # Initialize pymol
-            cmd.reinitialize()
-            cmd.set("retain_order", 1)
+                # Initialize pymol
+                cmd.reinitialize()
+                cmd.set("retain_order", 1)
 
-            # Load reference protein and ligand
-            cmd.load(reference_protein_pdb, "reference_protein")
-            cmd.load(reference_ligand_sdf, "reference_ligand")
-            cmd.select("reference_pocket",
-                       "br. (%reference_protein and name CA+C+N) w. 10.0 for (%reference_ligand and not h.)")
+                # Load reference protein and ligand
+                cmd.load(reference_protein_pdb, "reference_protein")
+                cmd.load(reference_ligand_sdf, "reference_ligand")
+                cmd.select("reference_pocket",
+                           "br. (%reference_protein and name CA+C+N) w. 10.0 for (%reference_ligand and not h.)")
 
-            # Load predicted protein and ligand
-            cmd.load(predicted_protein_pdb, "predicted_protein")
-            cmd.load(predicted_ligand_sdf, "predicted_ligand")
-            cmd.select("predicted_pocket",
-                       "br. (%predicted_protein and name CA+C+N) w. 10.0 for (%predicted_ligand and not h.)")
+                # Load predicted protein and ligand
+                cmd.load(predicted_protein_pdb, "predicted_protein")
+                cmd.load(predicted_ligand_sdf, "predicted_ligand")
+                cmd.select("predicted_pocket",
+                           "br. (%predicted_protein and name CA+C+N) w. 10.0 for (%predicted_ligand and not h.)")
 
-            # Align predicted pocket and predicted ligand to reference pocket
-            cmd.align("predicted_pocket", "reference_pocket")
-            cmd.matrix_copy("predicted_protein", "predicted_ligand")
+                # Align predicted pocket and predicted ligand to reference pocket
+                cmd.align("predicted_pocket", "reference_pocket")
+                cmd.matrix_copy("predicted_protein", "predicted_ligand")
 
-            # Transform predicted ligand
-            stored.pred_coords = []
-            cmd.iterate_state(1, "predicted_ligand", "stored.pred_coords.append((x, y, z))")
-            predicted_ligand = Chem.MolFromMolFile(predicted_ligand_sdf)
-            predicted_ligand_conformer = predicted_ligand.GetConformer()
-            for i, pred_coord in enumerate(stored.pred_coords):
-                x, y, z = pred_coord
-                predicted_ligand_conformer.SetAtomPosition(i, Point3D(x, y, z))
+                # Transform predicted ligand
+                stored.pred_coords = []
+                cmd.iterate_state(1, "predicted_ligand", "stored.pred_coords.append((x, y, z))")
+                predicted_ligand = Chem.MolFromMolFile(predicted_ligand_sdf)
+                predicted_ligand_conformer = predicted_ligand.GetConformer()
+                for i, pred_coord in enumerate(stored.pred_coords):
+                    x, y, z = pred_coord
+                    predicted_ligand_conformer.SetAtomPosition(i, Point3D(x, y, z))
 
-            # Compute RMSD
-            aligned_rmsd = check_rmsd(predicted_ligand, reference_ligand)["results"]["rmsd"]
+                # Compute RMSD
+                aligned_rmsd = check_rmsd(predicted_ligand, reference_ligand)["results"]["rmsd"]
 
-            # Update best aligned RMSD
-            if aligned_rmsd < best_aligned_rmsd or best_aligned_rmsd == np.inf:
-                if aligned_rmsd < best_aligned_rmsd:
-                    best_aligned_rmsd = aligned_rmsd
-                cmd.save(predicted_protein_pdb.replace(".pdb", "_aligned.pdb"), "predicted_protein")
-                with Chem.SDWriter(predicted_ligand_sdf.replace(".sdf", f"_aligned.sdf")) as f:
-                    f.write(predicted_ligand)
+                # Update best aligned RMSD
+                if aligned_rmsd < best_aligned_rmsd or best_aligned_rmsd == np.inf:
+                    if aligned_rmsd < best_aligned_rmsd:
+                        best_aligned_rmsd = aligned_rmsd
+                    cmd.save(predicted_protein_pdb.replace(".pdb", "_aligned.pdb"), "predicted_protein")
+                    with Chem.SDWriter(predicted_ligand_sdf.replace(".sdf", f"_aligned.sdf")) as f:
+                        f.write(predicted_ligand)
+
+        except Exception as e:
+            # A predicted ligand placed further than the 10 A pocket radius from every
+            # residue yields an EMPTY predicted_pocket selection, and cmd.align then
+            # raises "mobile selection must derive from one object only". Skipping this
+            # reference ligand leaves successful alignments untouched.
+            print(f"Alignment failed for one reference ligand: {type(e).__name__}: {e}")
+            continue
 
     return best_aligned_rmsd
 
@@ -491,12 +500,17 @@ def main(args: argparse.Namespace):
         #     print(f"Error running OpenStructure compare-ligand-structures for {pdb_ccd_id}: {e}")
         #     best_aligned_rmsd = 100.0
 
-        best_aligned_rmsd = run_structure_alignment_v2(predicted_protein_pdb=predicted_protein_pdb,
-                                                       predicted_ligand_sdf=predicted_ligand_sdf,
-                                                       reference_protein_pdb=reference_protein_pdb,
-                                                       reference_ligands_sdf=reference_ligands_sdf)
+        try:
+            best_aligned_rmsd = run_structure_alignment_v2(predicted_protein_pdb=predicted_protein_pdb,
+                                                           predicted_ligand_sdf=predicted_ligand_sdf,
+                                                           reference_protein_pdb=reference_protein_pdb,
+                                                           reference_ligands_sdf=reference_ligands_sdf)
+        except Exception as e:
+            print(f"Error running structure alignment for {pdb_ccd_id}: {e}")
+            best_aligned_rmsd = 100.0
         rmsd_dict[pdb_ccd_id] = best_aligned_rmsd
 
+    print(f"Aligned {len(rmsd_dict)} / {len(docking_data)} targets")
     print("RMSD <= 2.0:", len([k for k, v in rmsd_dict.items() if v <= 2.0]) / len(docking_data))
 
 
